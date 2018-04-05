@@ -4,6 +4,9 @@ rm(list=ls())
 library(dplyr)
 library(tools)
 library(leaflet)
+library(treemap)
+library(ggplot2)
+
 setwd("C:/Users/Deepam Jain/Downloads")
 
 df <- read.csv('h1b_kaggle.csv')
@@ -28,7 +31,7 @@ ggplot(data = dc, aes(x = reorder(CASE_STATUS,nr), y = nr/1000)) +
 #Get number of applications by case status per year
 
 df %>% filter(!is.na(CASE_STATUS)) %>% filter(!is.na(YEAR)) %>% 
-    group_by(CASE_STATUS,YEAR) %>% summarise(nr = length(CASE_STATUS)) -> dcy1
+    group_by(CASE_STATUS,YEAR) %>% summarise(nr = length(CASE_STATUS)) -> dcy
 
 ggplot(data=dcy,aes(x=YEAR,y=nr/1000,colour = CASE_STATUS)) + geom_line() + geom_point() +
   theme_gray() + theme(legend.position = "right") + labs(x="Year", y="Applications (thousands)", colour="Case status", 
@@ -68,7 +71,7 @@ ggplot(data = dj, aes(x = reorder(JOB_TITLE,nr), y = nr)) +
   coord_flip() + theme_bw(base_size = 10)  +
   labs(title="", x ="Job title (top 50)", y = "Number of applications")
 
-#Application
+#No. of application by location
 
 df %>% filter(!is.na(rlat)) %>% filter(!is.na(rlon)) %>% group_by(rlat,rlon) %>%
   summarise(nr = length(rlat)) %>% ungroup() -> dl
@@ -77,14 +80,14 @@ colnames(dl) <- c("lat","lon","value")
 bins <- c(max(dl$value),150000,100000,50000,min(dl$value))
 pal <- colorBin("RdYlGn", domain = dl$value, bins = bins)
 
-
 leaflet(data = dl) %>%
   addTiles() %>% setView(-99, 35, zoom = 4) %>%
   addCircleMarkers(
-    lat=dl$lat, lng=dl$lon, radius=sqrt(dl$value)/10, color = ~pal(dl$value), weight=1.5, opacity=0.8,
+    lat=dl$lat, lng=dl$lon, radius=sqrt(dl$value)/10, color = ~pal(dl$value), weight=1.2, opacity=0.7,
     popup= paste("<br><strong>Applications: </strong>", dl$value
     ))
 
+#No. of certified applications by wage
 
 df %>% filter(!is.na(rlat)) %>% filter(!is.na(rlon)) %>% 
   filter(CASE_STATUS == "CERTIFIED") %>% group_by(rlat,rlon) %>%
@@ -94,10 +97,35 @@ colnames(dw1) <- c("lat","lon","value")
 bins <- c(min(dw1$value),50000, 100000, 150000, 200000 ,max(dl$value))
 pal <- colorBin("RdYlGn", domain = dw1$value, bins = bins)
 
-
 leaflet(data = dw1) %>%
   addTiles() %>% setView(-99, 35, zoom = 4) %>%
   addCircleMarkers(
-    lat=dw1$lat, lng=dw1$lon, radius=sqrt(dw1$value)/20, color = ~pal(dw1$value), weight=1.5, opacity=0.8,
+    lat=dw1$lat, lng=dw1$lon, radius=sqrt(dw1$value)/20, color = ~pal(dw1$value), weight=1.2, opacity=0.7,
     popup= paste("<br><strong>Average wage: </strong>", round(dw1$value/1000,0), "k$"
     ))
+
+#group applications by state and year
+df %>% filter(!is.na(state)) %>%  filter(!is.na(YEAR)) %>%
+  group_by(YEAR, state) %>% summarise(nr = length(CASE_STATUS)) %>% ungroup() -> dys
+
+dys$state <- tolower(dys$state)
+dys$nr <- dys$nr/1000
+colnames(dys) <- c("year", "region","value")
+
+drawApplicationsTreeMap <- function(year){
+  dys2 <- subset(dys[,2:3], dys$year == year)
+  treemap(dys2, 
+          index=c("region"), 
+          type="value",
+          vSize = "value",  
+          vColor="value",
+          palette = "RdBu",  
+          title=sprintf("Applications during year %d",year), 
+          title.legend="Applications (thousands)",
+          fontsize.title = 14 
+  )
+}
+
+drawApplicationsTreeMap(2016)
+
+rm(df)
